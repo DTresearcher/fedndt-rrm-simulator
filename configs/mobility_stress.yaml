@@ -1,0 +1,50 @@
+simulation:
+  random_seed: 43
+  time_steps: 120
+
+network:
+  num_edge_nodes: 3
+  num_users: 75
+  total_resource_units: 120.0
+  base_latency_ms: 10.0
+  sla_latency_threshold_ms: 50.0
+
+traffic:
+  profile: "mobility_stress"
+  base_demand: 1.0
+  peak_multiplier: 2.6
+  noise_std: 0.30
+
+radio:
+  base_quality: 20.0
+  distance_loss_factor: 0.10
+  interference_mean: 2.3
+  interference_std: 0.9
+  quality_noise_std: 1.2
+
+federated:
+  rounds_per_step: 1
+  history_window: 8
+  prediction_smoothing: 0.55
+
+incentive:
+  enabled: true
+  freshness_weight: 0.25
+  accuracy_weight: 0.35
+  consistency_weight: 0.30
+  fairness_weight: 0.10
+
+stress:
+  enabled: true
+  overloaded_edge_node_id: 1
+  overload_start_step: 40
+  overload_end_step: 90
+  overload_multiplier: 2.2
+  mobility_shift_probability: 0.45
+
+  unreliable_edge_node_id: 2
+  stale_update_probability: 0.18
+  report_noise_probability: 0.25
+  report_noise_std: 0.45
+
+  greedy_observation_delay_steps: 5
