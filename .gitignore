@@ -38,3 +38,5 @@ results/figures/*.pdf
 !results/figures/.gitkeep
 !paper_assets/.gitkeep
 !paper_assets/figures/.gitkeep
+results/
+paper_assets/figures/*.png
