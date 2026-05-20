@@ -15,7 +15,7 @@ class SimulationConfig(BaseModel):
 class NetworkConfig(BaseModel):
     num_edge_nodes: int = Field(default=3, gt=0)
     num_users: int = Field(default=60, gt=0)
-    total_resource_units: float = Field(default=300.0, gt=0)
+    total_resource_units: float = Field(default=120.0, gt=0)
     base_latency_ms: float = Field(default=10.0, gt=0)
     sla_latency_threshold_ms: float = Field(default=50.0, gt=0)
 
@@ -49,6 +49,26 @@ class IncentiveConfig(BaseModel):
     fairness_weight: float = 0.10
 
 
+class StressConfig(BaseModel):
+    enabled: bool = False
+
+    # Creates an overloaded Edge/RAN domain during a selected time window.
+    overloaded_edge_node_id: int = Field(default=1, ge=0)
+    overload_start_step: int = Field(default=45, ge=0)
+    overload_end_step: int = Field(default=75, ge=0)
+    overload_multiplier: float = Field(default=2.4, gt=1.0)
+    mobility_shift_probability: float = Field(default=0.20, ge=0.0, le=1.0)
+
+    # Creates stale/noisy reporting from one Edge/RAN domain.
+    unreliable_edge_node_id: int = Field(default=2, ge=0)
+    stale_update_probability: float = Field(default=0.25, ge=0.0, le=1.0)
+    report_noise_probability: float = Field(default=0.30, ge=0.0, le=1.0)
+    report_noise_std: float = Field(default=0.45, ge=0.0)
+
+    # Makes the centralized greedy baseline more realistic.
+    greedy_observation_delay_steps: int = Field(default=4, ge=0)
+
+
 class ExperimentConfig(BaseModel):
     simulation: SimulationConfig
     network: NetworkConfig
@@ -56,6 +76,7 @@ class ExperimentConfig(BaseModel):
     radio: RadioConfig
     federated: FederatedConfig
     incentive: IncentiveConfig
+    stress: StressConfig = Field(default_factory=StressConfig)
 
 
 def load_config(path: str | Path) -> ExperimentConfig:

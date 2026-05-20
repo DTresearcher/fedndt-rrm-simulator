@@ -26,40 +26,51 @@ def add_incentive_scores(
     if missing_columns:
         raise ValueError(f"NDT state is missing required columns: {sorted(missing_columns)}")
 
-    frames: list[pd.DataFrame] = []
+    demand_signal_column = (
+        "reported_total_demand"
+        if "reported_total_demand" in ndt_state.columns
+        else "total_demand"
+    )
 
+    update_available_column = (
+        "update_available" if "update_available" in ndt_state.columns else None
+    )
+
+    frames: list[pd.DataFrame] = []
     max_active_users = max(float(ndt_state["active_users"].max()), 1.0)
 
     for edge_node_id, node_df in ndt_state.groupby("edge_node_id", sort=True):
         node_df = node_df.sort_values("time_step").copy()
 
         demand_denominator = node_df["total_demand"].replace(0, 1e-9)
-        prediction_accuracy = 1.0 - (
-            node_df["prediction_error_abs"] / demand_denominator
-        )
+        prediction_accuracy = 1.0 - (node_df["prediction_error_abs"] / demand_denominator)
         node_df["prediction_accuracy_score"] = prediction_accuracy.clip(0.0, 1.0)
 
+        demand_signal = node_df[demand_signal_column]
+
         rolling_std = (
-            node_df["total_demand"]
-            .rolling(window=config.federated.history_window, min_periods=2)
+            demand_signal.rolling(window=config.federated.history_window, min_periods=2)
             .std()
             .fillna(0.0)
         )
 
         rolling_mean = (
-            node_df["total_demand"]
-            .rolling(window=config.federated.history_window, min_periods=1)
+            demand_signal.rolling(window=config.federated.history_window, min_periods=1)
             .mean()
             .replace(0, 1e-9)
         )
 
         node_df["consistency_score"] = (1.0 - (rolling_std / rolling_mean)).clip(0.0, 1.0)
 
-        # In the current simulator, all edge nodes report every time step.
-        # Later, this can be extended to simulate stale or missing updates.
-        node_df["freshness_score"] = 1.0
+        if update_available_column:
+            node_df["freshness_score"] = node_df[update_available_column].clip(0.0, 1.0)
+        else:
+            node_df["freshness_score"] = 1.0
 
-        node_df["fairness_score"] = (node_df["active_users"] / max_active_users).clip(0.0, 1.0)
+        node_df["fairness_score"] = (node_df["active_users"] / max_active_users).clip(
+            0.0,
+            1.0,
+        )
 
         if config.incentive.enabled:
             node_df["incentive_score"] = (
