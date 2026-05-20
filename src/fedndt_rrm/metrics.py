@@ -71,9 +71,18 @@ def evaluate_allocations(
         + congestion_penalty_ms
     ).round(4)
 
-    merged["sla_violation"] = (
-        merged["latency_ms"] > config.network.sla_latency_threshold_ms
+    sla_threshold = config.network.sla_latency_threshold_ms
+    severe_sla_threshold = 2.0 * sla_threshold
+
+    merged["sla_violation"] = (merged["latency_ms"] > sla_threshold).astype(int)
+
+    merged["severe_sla_violation"] = (
+        merged["latency_ms"] > severe_sla_threshold
     ).astype(int)
+
+    merged["latency_excess_ms"] = (
+        merged["latency_ms"] - sla_threshold
+    ).clip(lower=0.0).round(4)
 
     merged["effective_throughput"] = (
         merged["allocated_resource_units"]
@@ -91,8 +100,10 @@ def evaluate_allocations(
             "load_ratio",
             "resource_utilization",
             "latency_ms",
+            "latency_excess_ms",
             "effective_throughput",
             "sla_violation",
+            "severe_sla_violation",
             "congestion_risk",
             "prediction_error_abs",
             "incentive_score",
@@ -105,6 +116,8 @@ def evaluate_allocations(
             avg_latency_ms=("latency_ms", "mean"),
             p95_latency_ms=("latency_ms", lambda x: x.quantile(0.95)),
             sla_violation_rate=("sla_violation", "mean"),
+            severe_sla_violation_rate=("severe_sla_violation", "mean"),
+            avg_latency_excess_ms=("latency_excess_ms", "mean"),
             avg_resource_utilization=("resource_utilization", "mean"),
             avg_effective_throughput=("effective_throughput", "mean"),
             avg_prediction_error_abs=("prediction_error_abs", "mean"),
