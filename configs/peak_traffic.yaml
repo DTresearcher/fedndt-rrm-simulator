@@ -1,0 +1,35 @@
+simulation:
+  random_seed: 42
+  time_steps: 100
+
+network:
+  num_edge_nodes: 3
+  num_users: 60
+  total_resource_units: 300.0
+  base_latency_ms: 10.0
+  sla_latency_threshold_ms: 50.0
+
+traffic:
+  profile: "peak"
+  base_demand: 1.0
+  peak_multiplier: 2.5
+  noise_std: 0.25
+
+radio:
+  base_quality: 20.0
+  distance_loss_factor: 0.08
+  interference_mean: 2.0
+  interference_std: 0.7
+  quality_noise_std: 1.0
+
+federated:
+  rounds_per_step: 1
+  history_window: 8
+  prediction_smoothing: 0.65
+
+incentive:
+  enabled: true
+  freshness_weight: 0.25
+  accuracy_weight: 0.35
+  consistency_weight: 0.30
+  fairness_weight: 0.10
