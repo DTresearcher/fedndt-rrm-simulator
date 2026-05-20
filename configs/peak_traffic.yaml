@@ -5,7 +5,7 @@ simulation:
 network:
   num_edge_nodes: 3
   num_users: 60
-  total_resource_units: 300.0
+  total_resource_units: 120.0
   base_latency_ms: 10.0
   sla_latency_threshold_ms: 50.0
 
