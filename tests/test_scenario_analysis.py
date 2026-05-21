@@ -6,6 +6,7 @@ import pytest
 from fedndt_rrm.scenario_analysis import (
     build_key_claim_summary,
     build_wide_improvement_table,
+    classify_improvement,
     compute_strategy_improvements,
     percentage_improvement_higher_is_better,
     percentage_improvement_lower_is_better,
@@ -205,3 +206,13 @@ def test_build_key_claim_summary() -> None:
 
     assert not claims.empty
     assert set(claims["claim_direction"]) == {"improved"}
+    assert "claim_strength" in claims.columns
+    assert set(claims["claim_strength"]) == {"strong_improvement"}
+
+
+def test_classify_improvement() -> None:
+    assert classify_improvement(10.0) == "strong_improvement"
+    assert classify_improvement(2.5) == "modest_improvement"
+    assert classify_improvement(0.5) == "neutral"
+    assert classify_improvement(-0.5) == "neutral"
+    assert classify_improvement(-2.0) == "regression"

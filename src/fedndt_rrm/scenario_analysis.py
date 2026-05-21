@@ -26,6 +26,45 @@ HIGHER_IS_BETTER_METRICS = [
 ]
 
 
+def classify_improvement(
+    improvement_pct: float,
+    *,
+    modest_threshold_pct: float = 1.0,
+    strong_threshold_pct: float = 5.0,
+) -> str:
+    """Classify an improvement percentage for claim-safe reporting.
+
+    The thresholds are intentionally conservative:
+    - >= 5%: strong improvement
+    - >= 1% and < 5%: modest improvement
+    - > -1% and < 1%: neutral
+    - <= -1%: regression
+    """
+    value = float(improvement_pct)
+
+    if value >= strong_threshold_pct:
+        return "strong_improvement"
+
+    if value >= modest_threshold_pct:
+        return "modest_improvement"
+
+    if value > -modest_threshold_pct:
+        return "neutral"
+
+    return "regression"
+
+
+CLAIM_CRITICAL_METRICS = [
+    "avg_latency_ms",
+    "p95_latency_ms",
+    "p99_latency_ms",
+    "avg_latency_excess_ms",
+    "max_latency_excess_ms",
+    "severe_sla_violation_rate",
+    "throughput_fairness_jain",
+]
+
+
 @dataclass(frozen=True)
 class ImprovementResult:
     scenario: str
@@ -246,6 +285,9 @@ def build_key_claim_summary(improvements: pd.DataFrame) -> pd.DataFrame:
 
     claim_frame["claim_direction"] = claim_frame["improvement_pct"].apply(
         lambda value: "improved" if value > 0 else "worse_or_equal"
+    )
+    claim_frame["claim_strength"] = claim_frame["improvement_pct"].apply(
+        classify_improvement
     )
 
     claim_frame = claim_frame.sort_values(
