@@ -6,6 +6,14 @@ import numpy as np
 import pandas as pd
 
 from fedndt_rrm.config import ExperimentConfig
+from fedndt_rrm.network_models import (
+    bounded_total_latency_ms,
+    db_to_linear,
+    queue_delay_ms,
+    queue_utilization,
+    radio_delay_from_capacity_ms,
+    shannon_capacity_mbps,
+)
 from fedndt_rrm.scientific_metrics import (
     communication_overhead_proxy,
     jain_fairness_index,
@@ -22,6 +30,21 @@ _EPSILON = 1e-9
 CENTRALIZED_STATE_FEATURE_COUNT = 7
 LIGHTWEIGHT_FEDAVG_PARAMETER_COUNT = 3
 FLOAT_PARAMETER_SIZE_BYTES = 8.0
+
+# Radio abstraction assumptions.
+# One abstract resource unit is treated as a small bandwidth slice.
+# This is not a physical 5G NR resource block model.
+BANDWIDTH_MHZ_PER_RESOURCE_UNIT = 0.10
+REFERENCE_SINR_DB = 10.0
+MIN_SERVICE_FACTOR = 0.30
+MAX_SERVICE_FACTOR = 2.20
+
+# Queueing/latency stability assumptions.
+QUEUE_DELAY_SCALE_MS = 250.0
+MAX_QUEUE_DELAY_MS = 1800.0
+MAX_RADIO_DELAY_MS = 900.0
+BASE_BACKHAUL_DELAY_MS = 4.0
+MAX_TOTAL_LATENCY_MS = 10000.0
 
 
 def _prediction_summary_from_frame(frame: pd.DataFrame) -> dict[str, float]:
@@ -113,6 +136,53 @@ def _communication_overhead_by_strategy(
     }
 
 
+def _capacity_from_row(row: pd.Series) -> float:
+    """Estimate Shannon-Hartley-inspired radio capacity.
+
+    avg_radio_quality is treated as a synthetic SINR-like dB index.
+    This is a documented network-level abstraction.
+    """
+    sinr_linear = db_to_linear(float(row["synthetic_sinr_db"]))
+    bandwidth_mhz = (
+        float(row["allocated_resource_units"]) * BANDWIDTH_MHZ_PER_RESOURCE_UNIT
+    )
+
+    return shannon_capacity_mbps(
+        bandwidth_mhz=bandwidth_mhz,
+        sinr_linear=sinr_linear,
+    )
+
+
+def _service_rate_from_row(row: pd.Series) -> float:
+    """Estimate service rate from allocated resources and radio capacity."""
+    reference_sinr_linear = db_to_linear(REFERENCE_SINR_DB)
+    reference_capacity = shannon_capacity_mbps(
+        bandwidth_mhz=(
+            float(row["allocated_resource_units"])
+            * BANDWIDTH_MHZ_PER_RESOURCE_UNIT
+        ),
+        sinr_linear=reference_sinr_linear,
+    )
+
+    capacity_factor = float(row["estimated_radio_capacity_mbps"]) / max(
+        reference_capacity,
+        _EPSILON,
+    )
+    service_factor = min(
+        max(capacity_factor, MIN_SERVICE_FACTOR),
+        MAX_SERVICE_FACTOR,
+    )
+
+    quality_penalty = 1.0 - (0.20 * float(row["quality_risk"]))
+    service_rate = (
+        float(row["allocated_resource_units"])
+        * service_factor
+        * max(quality_penalty, MIN_SERVICE_FACTOR)
+    )
+
+    return max(service_rate, _EPSILON)
+
+
 def _build_summary_metrics(
     per_step_metrics: pd.DataFrame,
     config: ExperimentConfig,
@@ -158,6 +228,14 @@ def _build_summary_metrics(
                 "max_latency_excess_ms": latency_summary[
                     "max_latency_excess_ms"
                 ],
+                "avg_queue_utilization_rho": strategy_frame[
+                    "queue_utilization_rho"
+                ].mean(),
+                "avg_queue_delay_ms": strategy_frame["queue_delay_ms"].mean(),
+                "avg_radio_delay_ms": strategy_frame["radio_delay_ms"].mean(),
+                "avg_estimated_radio_capacity_mbps": strategy_frame[
+                    "estimated_radio_capacity_mbps"
+                ].mean(),
                 "avg_resource_utilization": strategy_frame[
                     "resource_utilization"
                 ].mean(),
@@ -252,22 +330,64 @@ def evaluate_allocations(
     merged["load_ratio"] = load_ratio.round(4)
     merged["resource_utilization"] = load_ratio.clip(0.0, 1.0).round(4)
 
-    overload_ratio = (load_ratio - 1.0).clip(lower=0.0)
-
-    queue_delay_ms = (
-        config.network.base_latency_ms
-        * 2.2
-        * np.power(load_ratio.clip(lower=0.0), 2)
+    # Treat avg_radio_quality as a synthetic SINR-like dB quality index.
+    # This keeps the simulator at network abstraction level.
+    merged["synthetic_sinr_db"] = merged["avg_radio_quality"].clip(-10.0, 40.0)
+    merged["synthetic_sinr_linear"] = merged["synthetic_sinr_db"].apply(
+        db_to_linear
     )
 
-    radio_penalty_ms = 15.0 * merged["quality_risk"]
-    congestion_penalty_ms = 25.0 * overload_ratio
+    merged["estimated_radio_capacity_mbps"] = merged.apply(
+        _capacity_from_row,
+        axis=1,
+    )
 
-    merged["latency_ms"] = (
-        config.network.base_latency_ms
-        + queue_delay_ms
-        + radio_penalty_ms
-        + congestion_penalty_ms
+    merged["service_rate_units"] = merged.apply(
+        _service_rate_from_row,
+        axis=1,
+    )
+
+    merged["queue_utilization_rho"] = merged.apply(
+        lambda row: queue_utilization(
+            arrival_rate=float(row["total_demand"]),
+            service_rate=float(row["service_rate_units"]),
+        ),
+        axis=1,
+    )
+
+    merged["queue_delay_ms"] = merged.apply(
+        lambda row: queue_delay_ms(
+            arrival_rate=float(row["total_demand"]),
+            service_rate=float(row["service_rate_units"]),
+            base_scale_ms=QUEUE_DELAY_SCALE_MS,
+            max_delay_ms=MAX_QUEUE_DELAY_MS,
+        ),
+        axis=1,
+    )
+
+    merged["radio_delay_ms"] = merged.apply(
+        lambda row: radio_delay_from_capacity_ms(
+            demand_units=float(row["total_demand"]),
+            capacity_units=float(row["estimated_radio_capacity_mbps"]),
+            scale_ms=10.0,
+            max_delay_ms=MAX_RADIO_DELAY_MS,
+        ),
+        axis=1,
+    )
+
+    merged["backhaul_delay_ms"] = (
+        BASE_BACKHAUL_DELAY_MS + (12.0 * merged["congestion_risk"])
+    )
+
+    merged["latency_ms"] = merged.apply(
+        lambda row: bounded_total_latency_ms(
+            base_latency_ms=config.network.base_latency_ms,
+            radio_delay_ms=float(row["radio_delay_ms"]),
+            queue_delay_ms_value=float(row["queue_delay_ms"]),
+            backhaul_delay_ms=float(row["backhaul_delay_ms"]),
+            max_latency_ms=MAX_TOTAL_LATENCY_MS,
+        ),
+        axis=1,
     ).round(4)
 
     sla_threshold = config.network.sla_latency_threshold_ms
@@ -283,8 +403,10 @@ def evaluate_allocations(
         merged["latency_ms"] - sla_threshold
     ).clip(lower=0.0).round(4)
 
+    overload_ratio = (merged["queue_utilization_rho"] - 1.0).clip(lower=0.0)
+
     merged["effective_throughput"] = (
-        merged["allocated_resource_units"]
+        merged["service_rate_units"]
         * (1.0 - 0.35 * merged["quality_risk"])
         * (1.0 - 0.50 * overload_ratio.clip(upper=1.0))
     ).clip(lower=0.0).round(4)
@@ -299,10 +421,18 @@ def evaluate_allocations(
         "effective_throughput"
     ].transform(lambda values: jain_fairness_index(values.to_list()))
 
-    merged["resource_fairness_jain"] = merged["resource_fairness_jain"].round(4)
-    merged["throughput_fairness_jain"] = merged[
-        "throughput_fairness_jain"
-    ].round(4)
+    round_columns = [
+        "synthetic_sinr_linear",
+        "estimated_radio_capacity_mbps",
+        "service_rate_units",
+        "queue_utilization_rho",
+        "queue_delay_ms",
+        "radio_delay_ms",
+        "backhaul_delay_ms",
+        "resource_fairness_jain",
+        "throughput_fairness_jain",
+    ]
+    merged[round_columns] = merged[round_columns].round(4)
 
     per_step_metrics = merged[
         [
@@ -312,6 +442,14 @@ def evaluate_allocations(
             "allocated_resource_units",
             "total_demand",
             "predicted_demand",
+            "synthetic_sinr_db",
+            "synthetic_sinr_linear",
+            "estimated_radio_capacity_mbps",
+            "service_rate_units",
+            "queue_utilization_rho",
+            "queue_delay_ms",
+            "radio_delay_ms",
+            "backhaul_delay_ms",
             "load_ratio",
             "resource_utilization",
             "latency_ms",

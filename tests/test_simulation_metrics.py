@@ -15,6 +15,14 @@ EXPECTED_PER_STEP_COLUMNS = {
     "allocated_resource_units",
     "total_demand",
     "predicted_demand",
+    "synthetic_sinr_db",
+    "synthetic_sinr_linear",
+    "estimated_radio_capacity_mbps",
+    "service_rate_units",
+    "queue_utilization_rho",
+    "queue_delay_ms",
+    "radio_delay_ms",
+    "backhaul_delay_ms",
     "load_ratio",
     "resource_utilization",
     "latency_ms",
@@ -38,6 +46,10 @@ EXPECTED_SUMMARY_COLUMNS = {
     "severe_sla_violation_rate",
     "avg_latency_excess_ms",
     "max_latency_excess_ms",
+    "avg_queue_utilization_rho",
+    "avg_queue_delay_ms",
+    "avg_radio_delay_ms",
+    "avg_estimated_radio_capacity_mbps",
     "avg_resource_utilization",
     "avg_effective_throughput",
     "resource_fairness_jain",
@@ -125,3 +137,8 @@ def test_evaluate_allocations_produces_summary_metrics() -> None:
     assert (summary_metrics["centralized_overhead_bytes"] >= 0).all()
     assert (summary_metrics["federated_overhead_bytes"] >= 0).all()
     assert (summary_metrics["communication_overhead_bytes"] >= 0).all()
+
+    assert (summary_metrics["avg_queue_utilization_rho"] >= 0).all()
+    assert (summary_metrics["avg_queue_delay_ms"] >= 0).all()
+    assert (summary_metrics["avg_radio_delay_ms"] >= 0).all()
+    assert (summary_metrics["avg_estimated_radio_capacity_mbps"] >= 0).all()
