@@ -69,6 +69,22 @@ class StressConfig(BaseModel):
     greedy_observation_delay_steps: int = Field(default=4, ge=0)
 
 
+class NetworkModelConfig(BaseModel):
+    """Calibration parameters for network-level radio/queueing abstractions."""
+
+    bandwidth_mhz_per_resource_unit: float = Field(default=0.25, gt=0)
+    reference_sinr_db: float = 10.0
+    min_service_factor: float = Field(default=0.30, gt=0)
+    max_service_factor: float = Field(default=2.20, gt=0)
+    service_rate_calibration_multiplier: float = Field(default=1.90, gt=0)
+    queue_delay_scale_ms: float = Field(default=120.0, gt=0)
+    max_queue_delay_ms: float = Field(default=900.0, gt=0)
+    radio_delay_scale_ms: float = Field(default=4.0, gt=0)
+    max_radio_delay_ms: float = Field(default=250.0, gt=0)
+    base_backhaul_delay_ms: float = Field(default=3.0, ge=0)
+    max_total_latency_ms: float = Field(default=10000.0, gt=0)
+
+
 class ExperimentConfig(BaseModel):
     simulation: SimulationConfig
     network: NetworkConfig
@@ -77,6 +93,7 @@ class ExperimentConfig(BaseModel):
     federated: FederatedConfig
     incentive: IncentiveConfig
     stress: StressConfig = Field(default_factory=StressConfig)
+    network_model: NetworkModelConfig = Field(default_factory=NetworkModelConfig)
 
 
 def load_config(path: str | Path) -> ExperimentConfig:

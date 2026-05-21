@@ -23,3 +23,14 @@ def test_generated_telemetry_has_positive_values() -> None:
     assert (telemetry["traffic_demand"] > 0).all()
     assert (telemetry["radio_quality"] > 0).all()
     assert (telemetry["throughput_potential"] > 0).all()
+
+
+def test_network_model_defaults_are_loaded() -> None:
+    config = load_config("configs/peak_traffic.yaml")
+
+    assert config.network_model.bandwidth_mhz_per_resource_unit > 0
+    assert config.network_model.service_rate_calibration_multiplier > 0
+    assert config.network_model.queue_delay_scale_ms > 0
+    assert config.network_model.max_queue_delay_ms > 0
+    assert config.network_model.radio_delay_scale_ms > 0
+    assert config.network_model.max_radio_delay_ms > 0
