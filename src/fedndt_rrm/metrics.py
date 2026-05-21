@@ -34,16 +34,17 @@ FLOAT_PARAMETER_SIZE_BYTES = 8.0
 # Radio abstraction assumptions.
 # One abstract resource unit is treated as a small bandwidth slice.
 # This is not a physical 5G NR resource block model.
-BANDWIDTH_MHZ_PER_RESOURCE_UNIT = 0.10
+BANDWIDTH_MHZ_PER_RESOURCE_UNIT = 0.25
 REFERENCE_SINR_DB = 10.0
 MIN_SERVICE_FACTOR = 0.30
 MAX_SERVICE_FACTOR = 2.20
+SERVICE_RATE_CALIBRATION_MULTIPLIER = 1.90
 
 # Queueing/latency stability assumptions.
-QUEUE_DELAY_SCALE_MS = 250.0
-MAX_QUEUE_DELAY_MS = 1800.0
-MAX_RADIO_DELAY_MS = 900.0
-BASE_BACKHAUL_DELAY_MS = 4.0
+QUEUE_DELAY_SCALE_MS = 120.0
+MAX_QUEUE_DELAY_MS = 900.0
+MAX_RADIO_DELAY_MS = 250.0
+BASE_BACKHAUL_DELAY_MS = 3.0
 MAX_TOTAL_LATENCY_MS = 10000.0
 
 
@@ -178,6 +179,7 @@ def _service_rate_from_row(row: pd.Series) -> float:
         float(row["allocated_resource_units"])
         * service_factor
         * max(quality_penalty, MIN_SERVICE_FACTOR)
+        * SERVICE_RATE_CALIBRATION_MULTIPLIER
     )
 
     return max(service_rate, _EPSILON)
@@ -369,7 +371,7 @@ def evaluate_allocations(
         lambda row: radio_delay_from_capacity_ms(
             demand_units=float(row["total_demand"]),
             capacity_units=float(row["estimated_radio_capacity_mbps"]),
-            scale_ms=10.0,
+            scale_ms=4.0,
             max_delay_ms=MAX_RADIO_DELAY_MS,
         ),
         axis=1,
