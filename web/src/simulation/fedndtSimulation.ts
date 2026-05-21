@@ -123,6 +123,96 @@ export const defaultControls: SimulationControls = {
   radioDelayScale: 4,
 }
 
+export const scenarioPresets: Record<string, SimulationControls> = {
+  peakTraffic: {
+    ...defaultControls,
+    numUsers: 60,
+    peakMultiplier: 2.2,
+    mobilityShiftProbability: 0.10,
+    overloadMultiplier: 1.4,
+    staleUpdateProbability: 0.05,
+    reportingNoiseProbability: 0.08,
+    greedyDelaySteps: 2,
+    radioNoiseLevel: 1.4,
+  },
+  unreliableStress: {
+    ...defaultControls,
+    numUsers: 75,
+    peakMultiplier: 2.8,
+    mobilityShiftProbability: 0.22,
+    overloadMultiplier: 2.6,
+    staleUpdateProbability: 0.25,
+    reportingNoiseProbability: 0.35,
+    greedyDelaySteps: 5,
+    radioNoiseLevel: 2.2,
+  },
+  mobilityStress: {
+    ...defaultControls,
+    numUsers: 80,
+    peakMultiplier: 2.6,
+    mobilityShiftProbability: 0.48,
+    overloadMultiplier: 2.2,
+    staleUpdateProbability: 0.18,
+    reportingNoiseProbability: 0.25,
+    greedyDelaySteps: 5,
+    radioNoiseLevel: 2.4,
+  },
+  overloadStress: {
+    ...defaultControls,
+    numUsers: 90,
+    totalResources: 120,
+    peakMultiplier: 3.4,
+    mobilityShiftProbability: 0.25,
+    overloadMultiplier: 3.5,
+    staleUpdateProbability: 0.20,
+    reportingNoiseProbability: 0.30,
+    greedyDelaySteps: 5,
+    radioNoiseLevel: 2.5,
+  },
+  highNoiseRadio: {
+    ...defaultControls,
+    numUsers: 75,
+    peakMultiplier: 2.6,
+    mobilityShiftProbability: 0.28,
+    overloadMultiplier: 2.4,
+    staleUpdateProbability: 0.20,
+    reportingNoiseProbability: 0.32,
+    greedyDelaySteps: 5,
+    radioNoiseLevel: 5.5,
+  },
+  lowCapacity: {
+    ...defaultControls,
+    numUsers: 75,
+    totalResources: 90,
+    peakMultiplier: 2.8,
+    mobilityShiftProbability: 0.25,
+    overloadMultiplier: 2.7,
+    staleUpdateProbability: 0.22,
+    reportingNoiseProbability: 0.35,
+    greedyDelaySteps: 5,
+    radioNoiseLevel: 2.4,
+  },
+}
+
+export type ClaimStrength = 'strong_improvement' | 'modest_improvement' | 'neutral' | 'regression'
+
+export function classifyImprovement(improvementPct: number): ClaimStrength {
+  if (improvementPct >= 5) return 'strong_improvement'
+  if (improvementPct >= 1) return 'modest_improvement'
+  if (improvementPct > -1) return 'neutral'
+  return 'regression'
+}
+
+export function lowerIsBetterImprovement(baselineValue: number, targetValue: number) {
+  if (Math.abs(baselineValue) <= EPSILON) return 0
+  return ((baselineValue - targetValue) / Math.abs(baselineValue)) * 100
+}
+
+export function higherIsBetterImprovement(baselineValue: number, targetValue: number) {
+  if (Math.abs(baselineValue) <= EPSILON) return 0
+  return ((targetValue - baselineValue) / Math.abs(baselineValue)) * 100
+}
+
 function seededRandom(seed: number) {
   let state = seed >>> 0
   return () => {
@@ -265,15 +355,20 @@ function generateNodeSnapshots(controls: SimulationControls): NodeSnapshot[] {
   return snapshots
 }
 
-function allocateForStep(stepNodes: NodeSnapshot[], strategy: Strategy, controls: SimulationControls): number[] {
+function allocateForStep(stepNodes: NodeSnapshot[], strategy: Strategy, controls: SimulationControls, allSnapshots: NodeSnapshot[]): number[] {
   if (strategy === 'static') {
     return stepNodes.map(() => controls.totalResources / controls.numNodes)
   }
 
   if (strategy === 'greedy') {
     const delayedStep = Math.max(0, stepNodes[0].step - controls.greedyDelaySteps)
-    const sameNodes = stepNodes.map((node) => ({ ...node, demand: node.step === delayedStep ? node.demand : node.demand }))
-    const scores = sameNodes.map((node) => Math.max(node.demand, EPSILON))
+    const delayedNodes = stepNodes.map((node) => {
+      return (
+        allSnapshots.find((candidate) => candidate.step === delayedStep && candidate.nodeId === node.nodeId) ??
+        node
+      )
+    })
+    const scores = delayedNodes.map((node) => Math.max(node.demand, EPSILON))
     const totalScore = scores.reduce((sum, score) => sum + score, 0)
     return scores.map((score) => (controls.totalResources * score) / totalScore)
   }
@@ -412,7 +507,7 @@ export function runSimulation(controls: SimulationControls): SimulationResult {
   for (let step = 0; step < normalizedControls.timeSteps; step += 1) {
     const stepNodes = nodeSnapshots.filter((node) => node.step === step)
     for (const strategy of strategies) {
-      const allocations = allocateForStep(stepNodes, strategy, normalizedControls)
+      const allocations = allocateForStep(stepNodes, strategy, normalizedControls, nodeSnapshots)
       stepNodes.forEach((node, index) => {
         allSteps.push(evaluateStrategyStep(node, allocations[index], strategy, normalizedControls))
       })
