@@ -17,3 +17,10 @@ these runs used confirmatory seeds (1000 and above).
 
 - **Low-quality-contributors scenario.** The incentive lowered the FL validation loss by about 40%, yet slightly increased latency. The cleaner global model relies more on lagged inputs, and the low-quality sites feed it noisy local inputs at inference. This is reported as a finding; it is not a bug.
 - **Baseline scenario.** The incentive had no measurable effect, as expected, because no site sends bad updates.
+
+## Deviations after the confirmatory run (analysis reporting only)
+
+| # | Change | Reason | Effect |
+|---|---|---|---|
+| D1 | `abs_diff` (focal − reference, in metric units) added to every comparison | Relative improvement is unstable when the reference is close to zero (drop rates of about 1e-6), which produced extreme percentages | Reporting only. Labels, tests and p-values are unchanged |
+| D2 | Docker pipeline restarted with the correct worker count | `nproc` honours `OMP_NUM_THREADS=1`, so the first launch ran on a single core. It was stopped before any output file was written | None. Same seeds, same code |

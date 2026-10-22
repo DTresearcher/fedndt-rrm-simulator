@@ -103,6 +103,7 @@ def paired_test(focal: np.ndarray, ref: np.ndarray, metric: str, seed: int = 0) 
         "ref_mean": float(ref.mean()),
         "ref_sd": float(ref.std(ddof=1)),
         "improvement_pct": float(d.mean()),
+        "abs_diff": float((focal - ref).mean()),  # focal minus reference, in metric units
         "ci_low": lo,
         "ci_high": hi,
         "p_raw": p,
@@ -162,7 +163,7 @@ def compare(df: pd.DataFrame, comparisons=COMPARISONS, metrics=None) -> pd.DataF
             r["label"] = claim_label(r["improvement_pct"], r["p_holm"], r["ci_low"], r["ci_high"])
         rows.extend(family)
     cols = ["scenario", "hypothesis", "focal", "reference", "metric", "primary", "n", "focal_mean", "focal_sd",
-            "ref_mean", "ref_sd", "improvement_pct", "ci_low", "ci_high", "p_raw", "p_holm", "cohen_dz", "a12", "label"]
+            "ref_mean", "ref_sd", "improvement_pct", "abs_diff", "ci_low", "ci_high", "p_raw", "p_holm", "cohen_dz", "a12", "label"]
     return pd.DataFrame(rows)[cols]
 
 
