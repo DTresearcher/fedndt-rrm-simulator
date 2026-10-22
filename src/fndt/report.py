@@ -127,7 +127,7 @@ def fig_sweep(sw: pd.DataFrame, out: Path, axis: str, metric: str, xlabel: str) 
     ax.set_ylabel(METRIC_TITLE[metric])
     if metric.endswith("_ms"):
         ax.set_yscale("log")
-    ax.legend(fontsize=7, ncol=2)
+    ax.legend(fontsize=7, ncol=4, loc="upper center", bbox_to_anchor=(0.5, -0.2))
     _save(fig, out, f"sweep_{axis}_{metric}")
 
 
@@ -141,15 +141,16 @@ def fig_abg(sw: pd.DataFrame, out: Path, base: str, metric: str = "mean_latency_
     abg = agg["value"].str.split("/", expand=True).astype(float)
     agg["alpha"], agg["beta"], agg["gamma"] = abg[0], abg[1], abg[2]
     fig, ax = plt.subplots(figsize=(4.6, 3.8))
-    lim = max(abs(agg["mean"]).max(), 0.5)
-    sc = ax.scatter(agg.alpha, agg.beta, c=agg["mean"], cmap="RdBu", vmin=-lim, vmax=lim, s=420, marker="s", edgecolor="white")
+    lim = min(max(abs(agg["mean"]).max(), 0.5), 25.0)  # colour clipped at +/-25%; cell labels give exact values
+    sc = ax.scatter(agg.alpha, agg.beta, c=agg["mean"].clip(-lim, lim), cmap="RdBu", vmin=-lim, vmax=lim, s=420, marker="s", edgecolor="white")
     for _, r in agg.iterrows():
-        ax.text(r.alpha, r.beta, f"{r['mean']:+.1f}", ha="center", va="center", fontsize=7, color=INK)
+        ink = "white" if abs(r["mean"]) > 0.6 * lim else INK
+        ax.text(r.alpha, r.beta, f"{r['mean']:+.1f}", ha="center", va="center", fontsize=7, color=ink)
     ax.set_xlabel("α (quality weight)")
     ax.set_ylabel("β (cost weight);  γ = 1 − α − β")
     ax.set_xlim(-0.15, 1.15)
     ax.set_ylim(-0.15, 1.15)
-    fig.colorbar(sc, ax=ax, label="Latency improvement vs FNDT w/o incentive (%)")
+    fig.colorbar(sc, ax=ax, extend="both", label="Latency improvement vs FNDT w/o incentive (%)")
     ax.set_title(f"Incentive weights, {base.replace('_', ' ')}", loc="left", fontsize=9)
     _save(fig, out, f"abg_{base}")
     return agg
