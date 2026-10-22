@@ -1,0 +1,3 @@
+name: hotspot
+description: Evening event at the centre site (17-21 h) draws users and raises their demand by 50 percent.
+traffic: {hotspot_sites: [0], hotspot_multiplier: 1.5, hotspot_attraction: 0.002}

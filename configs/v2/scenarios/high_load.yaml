@@ -1,0 +1,3 @@
+name: high_load
+description: Traffic pressure raised by 25 percent across all users.
+traffic: {load_scale: 1.25}

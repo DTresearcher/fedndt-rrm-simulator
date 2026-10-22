@@ -1,0 +1,3 @@
+name: heavy_dropout
+description: Base round dropout 30 percent; two resource-poor sites drop a further 40 percent.
+fl: {base_dropout: 0.3, dropout_sites: [3, 4], dropout_sites_prob: 0.4}

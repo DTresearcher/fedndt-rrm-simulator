@@ -1,0 +1,5 @@
+.git
+.venv*
+web/node_modules
+results
+**/__pycache__

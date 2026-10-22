@@ -40,3 +40,7 @@ results/figures/*.pdf
 !paper_assets/figures/.gitkeep
 results/
 paper_assets/figures/*.png
+
+.venv-v2/
+results/v2*/
+**/__pycache__/
