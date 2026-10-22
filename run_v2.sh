@@ -4,7 +4,7 @@ set -euo pipefail
 OUT=${OUT:-results/v2}
 SEEDS=${SEEDS:-30}
 SWEEP_SEEDS=${SWEEP_SEEDS:-10}
-WORKERS=${WORKERS:-$(nproc 2>/dev/null || echo 4)}
+WORKERS=${WORKERS:-$(python -c "import os; print(len(os.sched_getaffinity(0)))")}
 case "${1:-all}" in
   test)   python -m pytest -q tests_v2 ;;
   main)   python -m fndt.experiments main --seeds "$SEEDS" --workers "$WORKERS" --out "$OUT" ;;
