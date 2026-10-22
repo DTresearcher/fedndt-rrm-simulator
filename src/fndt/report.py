@@ -162,11 +162,13 @@ def fig_tradeoff(df: pd.DataFrame, out: Path, scenario: str = "baseline") -> Non
     for k in ORDER:
         x = max(d.loc[k, "overhead_mb"], 1e-3)
         ax.scatter(x, d.loc[k, "mean_latency_ms"], color=COLOR[k], s=60, zorder=3, edgecolor="white", linewidth=1.5)
-        offset = {"fl_only": (-30, 14), "ndt_only": (-6, 26), "fndt_no_incentive": (8, 14), "fndt": (8, -12)}.get(k, (5, 4))
+        offset = {"greedy": (-44, 6), "fl_only": (-34, 16), "ndt_only": (12, 28), "fndt_no_incentive": (16, 14), "fndt": (14, -14)}.get(k, (5, 4))
         ax.annotate(LABEL[k], (x, d.loc[k, "mean_latency_ms"]), xytext=offset, textcoords="offset points", fontsize=7.5, color=INK,
                     arrowprops={"arrowstyle": "-", "color": MUTED, "lw": 0.6} if k in ("fl_only", "ndt_only", "fndt_no_incentive", "fndt") else None)
     ax.set_xscale("log")
     ax.set_yscale("log")
+    lo, hi = ax.get_ylim()
+    ax.set_ylim(lo * 0.85, hi)
     ax.set_xlabel("Control-plane overhead (MB/day, log; Static shown at 0.001)")
     ax.set_ylabel("Mean latency (ms, log)")
     ax.set_title(f"Latency vs overhead, {scenario}", loc="left", fontsize=9)
