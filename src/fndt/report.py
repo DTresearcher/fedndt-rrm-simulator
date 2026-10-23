@@ -62,8 +62,8 @@ plt.rcParams.update({
 
 
 def _save(fig, out: Path, name: str) -> None:
-    fig.savefig(out / f"{name}.png", bbox_inches="tight")
-    fig.savefig(out / f"{name}.pdf", bbox_inches="tight")
+    fig.savefig(out / f"{name}.png", bbox_inches="tight", metadata={"Software": None})
+    fig.savefig(out / f"{name}.pdf", bbox_inches="tight", metadata={"CreationDate": None, "Producer": None, "Creator": None})
     plt.close(fig)
 
 
