@@ -222,23 +222,27 @@ def fig_abg(agg: pd.DataFrame, out: Path, base: str) -> None:
 
 
 def fig_tradeoff(df: pd.DataFrame, out: Path, scenario: str = "baseline") -> None:
-    d = df[df.scenario == scenario].groupby("strategy")[["mean_latency_ms", "overhead_mb"]].mean()
-    fig, ax = plt.subplots(figsize=(5.6, 3.6))
-    offsets = {"static": (6, -2), "greedy": (-40, 8), "greedy_sr": (8, 8), "centralized": (-30, 10), "fl_only": (-48, 12),
-               "fl_state": (-20, -16), "ndt_only": (6, 18), "fndt_no_incentive": (12, 10), "fndt": (14, -12)}
-    for k in ORDER:
-        x = max(d.loc[k, "overhead_mb"], 1e-3)
-        y = d.loc[k, "mean_latency_ms"]
-        ax.plot(x, y, "o", ms=8, color=COLOR[k], zorder=3, **_marker(k))
-        ax.annotate(LABEL[k], (x, y), xytext=offsets.get(k, (5, 4)), textcoords="offset points", fontsize=7, color=INK,
-                    arrowprops={"arrowstyle": "-", "color": MUTED, "lw": 0.5})
-    ax.set_xscale("log")
-    ax.set_yscale("log")
-    lo, hi = ax.get_ylim()
-    ax.set_ylim(lo * 0.85, hi * 1.1)
-    ax.set_xlabel("Control-plane overhead (MB/day, log; Static shown at 0.001)")
-    ax.set_ylabel("Mean latency (ms, log)")
-    ax.set_title(f"Latency vs overhead, {scenario}", loc="left", fontsize=9)
+    """Latency and control overhead per strategy, as two panels sharing the strategy axis."""
+    d = df[df.scenario == scenario].groupby("strategy")[["mean_latency_ms", "overhead_mb", "raw_records_exposed"]].mean()
+    ks = [k for k in ORDER if k in d.index]
+    y = np.arange(len(ks))
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(8.2, 3.6), sharey=True)
+    for i, k in enumerate(ks):
+        a1.plot(d.loc[k, "mean_latency_ms"], i, "o", ms=7, color=COLOR[k], **_marker(k))
+        a2.plot(max(d.loc[k, "overhead_mb"], 1e-3), i, "o", ms=7, color=COLOR[k], **_marker(k))
+        if d.loc[k, "raw_records_exposed"] > 0:
+            a2.annotate("exports raw\nper-user data", (d.loc[k, "overhead_mb"], i), xytext=(-70, -4), textcoords="offset points", fontsize=7, color=INK)
+    a1.set_yticks(y, [LABEL[k] for k in ks])
+    a1.invert_yaxis()
+    a1.set_xscale("log")
+    a2.set_xscale("log")
+    a1.set_xlabel("Mean latency (ms, log)")
+    a2.set_xlabel("Control-plane overhead (MB/day, log; Static at 0.001)")
+    for a in (a1, a2):
+        a.grid(axis="y", visible=False)
+    a1.set_title(f"Latency, {scenario}", loc="left", fontsize=9)
+    a2.set_title("Control overhead", loc="left", fontsize=9)
+    fig.tight_layout()
     _save(fig, out, f"tradeoff_{scenario}")
 
 
