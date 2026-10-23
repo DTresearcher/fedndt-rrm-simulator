@@ -2,7 +2,7 @@
 and Holt's linear exponential smoothing (the non-learned twin predictor).
 
 The forecast for slot tau may only use data up to slot tau - 1 - staleness.
-tests_v2/test_no_leakage.py checks this by perturbing future data.
+tests/test_simulation.py::test_decisions_use_only_delivered_data checks this.
 """
 
 from __future__ import annotations

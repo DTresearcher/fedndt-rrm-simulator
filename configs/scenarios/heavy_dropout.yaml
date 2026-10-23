@@ -1,0 +1,3 @@
+name: heavy_dropout
+description: Federated rounds lose 40 percent of sites at random; two resource-poor sites drop a further 40 percent (80 percent in total).
+fl: {base_dropout: 0.4, dropout_sites: [3, 4], dropout_sites_prob: 0.4}

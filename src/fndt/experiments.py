@@ -1,10 +1,11 @@
 """Experiment runner: confirmatory scenario suite and pre-registered sensitivity sweeps.
 
 Usage:
-    python -m fndt.experiments all --out results/v2 --workers 8
+    python -m fndt.experiments all --out results --workers 8
     python -m fndt.experiments main --seeds 30
-    python -m fndt.experiments sweeps --sweep-seeds 10
-Development used seeds 0-4 only; confirmatory runs use seeds starting at 1000.
+    python -m fndt.experiments sweeps --sweep-seeds 20
+Development used seeds 0-4 only. The confirmatory runs reported in results/ use
+seeds starting at 2000 (Amendment 1); seeds 1000-1029 were used by the superseded first run.
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ from fndt.environment import build_environment
 from fndt.simulator import STRATEGIES, STRATEGY_BY_NAME, Run, _site_aggregates
 
 ROOT = Path(__file__).resolve().parents[2]
-SCENARIO_DIR = ROOT / "configs" / "v2" / "scenarios"
+SCENARIO_DIR = ROOT / "configs" / "scenarios"
 MAIN_SCENARIOS = [
     "baseline",
     "high_load",
@@ -36,11 +37,13 @@ MAIN_SCENARIOS = [
     "mobility",
     "unreliable_telemetry",
     "low_quality_contributors",
+    "corrupted_measurements",
     "high_noniid",
     "heavy_dropout",
     "radio_degradation",
+    "model_mismatch",
 ]
-CONFIRMATORY_SEED0 = 1000
+CONFIRMATORY_SEED0 = 2000
 ALL = [s.name for s in STRATEGIES]
 
 
@@ -52,7 +55,7 @@ def _simplex(step: float):
 
 
 def sweep_jobs(seeds: list[int]):
-    """Pre-registered sensitivity axes (the paper's stated next steps)."""
+    """Sensitivity axes: the paper's stated next steps plus twin model error."""
     jobs = []
     for v in (0.8, 0.9, 1.0, 1.1, 1.2, 1.3):
         jobs.append(("traffic_pressure", v, "baseline", {"traffic": {"load_scale": v}}, ALL))
@@ -62,10 +65,13 @@ def sweep_jobs(seeds: list[int]):
         jobs.append(("telemetry_staleness", v, "baseline", {"telemetry": {"staleness_slots": v}}, ALL))
     for v in (0.0, 0.25, 0.5, 0.75, 1.0):
         jobs.append(("noniid", v, "baseline", {"traffic": {"noniid": v}}, ALL))
+    for v in (0.5, 1.0, 2.0, 3.0):
+        jobs.append(("service_variability", v, "baseline", {"network": {"service_scv": v}}, ALL))
     for v in (0.0, 0.3, 0.6):
         jobs.append(("elasticity", v, "heavy_dropout", {"incentive": {"elasticity": v}}, ["fndt_no_incentive", "fndt"]))
+    grid = list(_simplex(0.25)) + [(0.5, 0.2, 0.3)]  # simplex grid plus the default weights
     for base in ("baseline", "low_quality_contributors"):
-        for a, b, g in _simplex(0.25):
+        for a, b, g in grid:
             jobs.append((f"alpha_beta_gamma:{base}", f"{a}/{b}/{g}", base,
                          {"incentive": {"alpha": a, "beta": b, "gamma": g}}, ["fndt_no_incentive", "fndt"]))
     return [(axis, value, base, extra, strategies, seed) for axis, value, base, extra, strategies in jobs for seed in seeds]
@@ -128,9 +134,9 @@ def manifest(out: Path, args) -> None:
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("what", choices=["main", "sweeps", "all"])
-    ap.add_argument("--out", default=str(ROOT / "results" / "v2"))
+    ap.add_argument("--out", default=str(ROOT / "results"))
     ap.add_argument("--seeds", type=int, default=30)
-    ap.add_argument("--sweep-seeds", type=int, default=10)
+    ap.add_argument("--sweep-seeds", type=int, default=20)
     ap.add_argument("--workers", type=int, default=os.cpu_count() or 2)
     ap.add_argument("--seed0", type=int, default=CONFIRMATORY_SEED0, help="first seed; use 0 for development checks")
     args = ap.parse_args(argv)

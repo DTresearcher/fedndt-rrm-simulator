@@ -97,3 +97,26 @@ def test_fedavg_one_full_batch_step_equals_central_gradient_step():
 def test_scenario_override_rejects_unknown_keys():
     with pytest.raises(KeyError):
         make_scenario({"traffic": {"no_such_field": 1}})
+
+
+def test_mg1_pollaczek_khinchine_mean():
+    lam, mu = np.array([6.0]), np.array([10.0])
+    rho = 0.6
+    for scv in (0.5, 1.0, 2.0):
+        st = queue_step(lam, mu, np.zeros(1), job=1.0, dt=60.0, buffer_s=2.0, scv=scv)
+        assert st.service_mean_s[0] == pytest.approx(0.1 * (1 + rho * (1 + scv) / (2 * (1 - rho))))
+    mm1 = queue_step(lam, mu, np.zeros(1), job=1.0, dt=60.0, buffer_s=2.0)
+    assert mm1.service_mean_s[0] == pytest.approx(1.0 / (10.0 - 6.0))
+
+
+def test_holm_matches_definition():
+    from fndt.stats import holm
+    p = [0.01, 0.04, 0.03, 0.005]
+    assert holm(p) == pytest.approx([0.03, 0.06, 0.06, 0.02])
+
+
+def test_rate_labels_need_practical_difference():
+    from fndt.stats import claim_label
+    assert claim_label(50.0, 1e-6, 10.0, 90.0, "drop_rate", abs_diff=0.0002) == "Neutral"
+    assert claim_label(50.0, 1e-6, 10.0, 90.0, "drop_rate", abs_diff=0.01) == "Strong improvement"
+    assert claim_label(-8.0, 1e-6, -12.0, -4.0, "mean_latency_ms") == "Regression"

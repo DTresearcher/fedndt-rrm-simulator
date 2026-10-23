@@ -1,0 +1,3 @@
+name: high_load
+description: Stress test - traffic pressure raised by 25 percent across all users, pushing several sites to saturation at their peaks.
+traffic: {load_scale: 1.25}

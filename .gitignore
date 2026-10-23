@@ -1,46 +1,22 @@
 # Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
 .pytest_cache/
 .ruff_cache/
-.mypy_cache/
-
-# Virtual environments
-.venv/
-venv/
-env/
-
-# Secrets
-.env
-.env.local
-*.pem
-*.key
+.venv*/
+*.egg-info/
+build/
+dist/
 
 # macOS
 .DS_Store
 
-# Build outputs
-dist/
-build/
-*.egg-info/
+# Secrets
+.env
+.env.*
 
-# Generated simulation outputs
-results/*.csv
-results/*.json
-results/figures/*.png
-results/figures/*.jpg
-results/figures/*.pdf
-
-# Keep output folders
-!results/.gitkeep
-!results/figures/.gitkeep
-!paper_assets/.gitkeep
-!paper_assets/figures/.gitkeep
-results/
-paper_assets/figures/*.png
-
-.venv-v2/
-results/v2*/
-**/__pycache__/
+# Run logs (results/ itself is committed)
+results/*.log
+site/
+legacy/web/node_modules/
+legacy/web/dist/

@@ -1,7 +1,8 @@
 """Queueing and capacity-assignment models.
 
 Each site has a radio queue and an MEC queue. Within a slot each queue is an
-M/M/1 system (mean sojourn L / (mu - lambda), Kleinrock 1975) sitting on top of
+M/M/1 system (mean sojourn L / (mu - lambda), Kleinrock 1975), or M/G/1 when the
+service variability differs (Pollaczek-Khinchine), sitting on top of
 a fluid backlog that carries overload from slot to slot through a Lindley-type
 recursion Q' = min(max(0, Q + (lambda - mu) dt), Q_max) (Lindley, 1952).
 Traffic that overflows the buffer is dropped.
@@ -27,8 +28,13 @@ class QueueStep:
     utilisation: np.ndarray
 
 
-def queue_step(lam, mu, backlog, job, dt, buffer_s) -> QueueStep:
-    """Advance one slot for vectors of sites. Units: lam, mu per second; job, backlog in work units."""
+def queue_step(lam, mu, backlog, job, dt, buffer_s, scv: float = 1.0) -> QueueStep:
+    """Advance one slot for vectors of sites. Units: lam, mu per second; job, backlog in work units.
+
+    The within-slot sojourn uses the Pollaczek-Khinchine mean for M/G/1,
+    job/mu * (1 + rho (1 + scv) / (2 (1 - rho))), which equals the M/M/1 value
+    job / (mu (1 - rho)) when the service-time squared coefficient of variation scv = 1.
+    """
     lam = np.maximum(np.asarray(lam, float), 0.0)
     mu = np.maximum(np.asarray(mu, float), 1e-9)
     q_max = buffer_s * mu
@@ -38,7 +44,7 @@ def queue_step(lam, mu, backlog, job, dt, buffer_s) -> QueueStep:
     served = lam * dt + backlog - q_end - dropped
     wait = 0.5 * (backlog + q_end) / mu
     rho = np.minimum(lam / mu, RHO_CAP)
-    service = job / (mu * (1.0 - rho))
+    service = (job / mu) * (1.0 + rho * (1.0 + scv) / (2.0 * (1.0 - rho)))
     return QueueStep(
         mean_s=wait + service,
         wait_s=wait,

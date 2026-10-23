@@ -60,8 +60,12 @@ class FederatedTrainer:
         comm = self.fl.tx_power_w * bits / self.uplink_bps
         return comp + comm
 
-    def retrain(self, k: int, local_sets, env, val_set, eval_set) -> np.ndarray:
-        """Run the configured FedAvg rounds. local_sets[i] = (X_i, y_i)."""
+    def retrain(self, k: int, local_sets, env, val_set) -> np.ndarray:
+        """Run the configured FedAvg rounds. local_sets[i] = (X_i, y_i).
+
+        val_set is the twin's synchronised report data: the only data the server holds.
+        It scores update quality (incentive arm) and tracks convergence (all arms).
+        """
         fl, inc = self.fl, self.inc
         n = np.array([len(y) for _, y in local_sets], dtype=float)
         e_all = self.energy(n)
@@ -83,7 +87,7 @@ class FederatedTrainer:
             self.log.energy_j += float(e_all[list(updates)].sum()) if updates else 0.0
             self.p_record = inc.participation_ewma * self.p_record + (1 - inc.participation_ewma) * joined
             if not updates:
-                losses.append(mse(self.w, *eval_set))
+                losses.append(mse(self.w, *val_set))
                 continue
             ids = np.array(sorted(updates))
             W = np.stack([updates[i] for i in ids])
@@ -114,6 +118,6 @@ class FederatedTrainer:
             else:
                 weight = n[ids]
                 self.w = (weight[:, None] * W).sum(axis=0) / weight.sum()
-            losses.append(mse(self.w, *eval_set))
+            losses.append(mse(self.w, *val_set))
         self.log.round_loss.append(losses)
         return self.w

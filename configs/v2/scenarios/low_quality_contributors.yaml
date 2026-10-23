@@ -1,3 +1,0 @@
-name: low_quality_contributors
-description: Two sites train on heavily noisy labels (60 percent std) and one site free-rides with random updates.
-fl: {low_quality_sites: [1, 4], low_quality_noise: 0.6, free_rider_sites: [6]}

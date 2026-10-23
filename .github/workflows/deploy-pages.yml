@@ -1,4 +1,4 @@
-name: Deploy Web Demo to GitHub Pages
+name: Deploy results site to GitHub Pages
 
 on:
   push:
@@ -18,57 +18,25 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    outputs:
-      is_latest: ${{ steps.freshness.outputs.is_latest }}
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Check deployment commit freshness
-        id: freshness
-        run: |
-          git fetch origin main --depth=1
-          if [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ]; then
-            echo "is_latest=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_latest=false" >> "$GITHUB_OUTPUT"
-            echo "Skipping stale deployment for $(git rev-parse --short HEAD); latest main is $(git rev-parse --short origin/main)."
-          fi
-
-      - name: Setup Node.js
-        if: steps.freshness.outputs.is_latest == 'true'
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
+          python-version: "3.12"
       - name: Install dependencies
-        if: steps.freshness.outputs.is_latest == 'true'
-        working-directory: web
-        run: npm ci
-
-      - name: Build Vite web app
-        if: steps.freshness.outputs.is_latest == 'true'
-        working-directory: web
-        run: npm run build
-
-      - name: Upload GitHub Pages artifact
-        if: steps.freshness.outputs.is_latest == 'true'
-        uses: actions/upload-pages-artifact@v3
+        run: pip install -r requirements.txt
+      - name: Build static results page from committed results
+        run: PYTHONPATH=src python -m fndt.site --results results --out site
+      - uses: actions/upload-pages-artifact@v3
         with:
-          path: web/dist
+          path: site
 
   deploy:
+    needs: build
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-
-    runs-on: ubuntu-latest
-    needs: build
-    if: needs.build.outputs.is_latest == 'true'
-
     steps:
       - name: Deploy to GitHub Pages
         id: deployment

@@ -1,136 +1,86 @@
-# FNDT Simulator (v2)
+# FNDT Simulator
 
 A network-level, closed-loop simulator and statistical evaluation pipeline for the
-**Federated Network Digital Twin (FNDT)** framework for incentive-aware edge and
-radio resource management in 5G/6G networks.
+**Federated Network Digital Twin (FNDT)** framework for incentive-aware edge and radio
+resource management in 5G/6G networks.
 
-> **v2 replaces the earlier prototype.** In the old web demo, strategy outcomes were
-> partly set by per-strategy constants. In v2, every strategy runs on the same
-> environment and queueing model and differs only in the information it receives
-> and the mechanism it uses. Nothing is tuned per strategy.
+It evaluates the paper's strategy taxonomy plus two diagnostic baselines, all on one
+shared network and queueing model:
 
-## What it models
+- **Heuristics:** Static, Greedy.
+- **Architectural designs:** Centralized, FL-only, NDT-only, FNDT without incentive, FNDT.
+- **Diagnostic baselines:** Greedy-SR, FL + state.
 
-- **Radio:** 7-site UMa layout with 3GPP TR 38.901 path loss and shadowing, the
-  TR 36.942 attenuated Shannon bound, and load-coupled interference.
-- **Traffic:** users with diurnal land-use traffic patterns, mobility, hotspots,
-  and edge-compute workload.
-- **Queues:** radio and MEC queues per site, using M/M/1 within a slot plus a
-  Lindley-type backlog that carries overload between slots, with drops at the buffer limit.
-- **Strategies:** the paper's seven — Static, Greedy, Centralized, FL-only, NDT-only,
-  FNDT without incentive, and FNDT.
-- **Learning:** FedAvg forecasting with the incentive engine
-  R_i = αQ_i − βC_i + γP_i, where Q is validation gain, C is device energy and
-  P is participation record.
-- **Statistics:** 30 paired seeds, Wilcoxon signed-rank tests, Holm correction,
-  bootstrap CIs, effect sizes, the paper's claim-safe labels, and sensitivity sweeps.
+Strategies differ only in the information they receive and the mechanism they use.
+No strategy receives a performance factor.
 
-Full equations and sources: [`docs/v2/MODEL.md`](docs/v2/MODEL.md) and
-[`docs/v2/REFERENCES.md`](docs/v2/REFERENCES.md).
-Evaluation plan, committed before the confirmatory runs:
-[`docs/v2/PREREGISTRATION.md`](docs/v2/PREREGISTRATION.md).
-Development changes: [`docs/v2/DEVLOG.md`](docs/v2/DEVLOG.md).
+## What is modelled
+
+| Part | Model | Sources |
+|---|---|---|
+| Radio | 7-site UMa layout, path loss and shadowing; attenuated Shannon bound; load-coupled interference | 3GPP TR 38.901, TR 36.942, ITU-R M.2412 |
+| Traffic | Land-use diurnal profiles, mobility, hotspots, edge-compute workload | Xu et al. 2017, Mao et al. 2017 |
+| Queues | Radio and MEC queue per site: M/M/1 (or M/G/1) within a slot plus a Lindley-type backlog with buffer drops | Kleinrock 1975, Lindley 1952 |
+| Allocation | Kleinrock square-root assignment; twin what-if over candidate allocations | Kleinrock 1976 |
+| Information | One explicit channel for every message to the controller: aggregation noise, pipeline faults, stale repeats, delay | docs/MODEL.md §5 |
+| Learning | FedAvg forecasting; incentive engine R_i = αQ_i − βC_i + γP_i (quality = validation gain, cost = device energy, participation record) | McMahan et al. 2017, Cao et al. 2021, Yang et al. 2021, Kang et al. 2019 |
+| Statistics | 30 paired seeds; Wilcoxon signed-rank with Holm correction; paired bootstrap CIs; d_z and A12; claim-safe labels; non-inferiority; Friedman ranks | Wilcoxon 1945, Holm 1979, Efron & Tibshirani 1993, Vargha & Delaney 2000, Demšar 2006, Arcuri & Briand 2011 |
+
+## Documentation
+
+| File | Contents |
+|---|---|
+| [`docs/MODEL.md`](docs/MODEL.md) | Equations, information model, strategies, metrics and limitations |
+| [`docs/REFERENCES.md`](docs/REFERENCES.md) | Every source in APA 7, with verified DOIs |
+| [`docs/PREREGISTRATION.md`](docs/PREREGISTRATION.md) | Evaluation plan, committed before any confirmatory run |
+| [`docs/PREREGISTRATION_AMENDMENT_1.md`](docs/PREREGISTRATION_AMENDMENT_1.md) | Amendment after the internal audit, committed before the reported runs |
+| [`docs/DEVLOG.md`](docs/DEVLOG.md) | Every development change, with its reason |
+
+## Results
+
+| Path | Contents |
+|---|---|
+| `results/REPORT.md` | Full statistical report |
+| `results/stats/` | Every test, with raw and Holm p-values, CIs and effect sizes |
+| `results/figures/` | 300 dpi PNG and vector PDF |
+| `results/raw/` | One row per scenario × seed × strategy |
+| `results/manifest.json` | Commit, package versions and seeds |
+
+The same results are published as a static page via GitHub Pages. That page runs no
+simulation; it only displays these files.
 
 ## Reproduce
 
 ```bash
-docker build --build-arg GIT_COMMIT=$(git rev-parse HEAD) -t fndt-sim:v2 .
-docker run --rm -v "$PWD/results:/app/results" fndt-sim:v2 all      # tests + suite + sweeps + report
-docker run --rm fndt-sim:v2 test                                     # 28 verification tests only
+docker build --build-arg GIT_COMMIT=$(git rev-parse HEAD) -t fndt-sim .
+docker run --rm -v "$PWD/results:/app/results" fndt-sim all    # tests, suite, sweeps, report, site
+docker run --rm fndt-sim test                                  # verification tests only
 ```
 
-Outputs are written to `results/v2/`:
-
-| Output | Contents |
-|---|---|
-| `REPORT.md` | Written statistical report |
-| `stats/*.csv` | Every test with raw and Holm p-values, CIs and effect sizes |
-| `figures/` | PNG at 300 dpi and vector PDF |
-| `raw/*.csv` | One row per scenario × seed × strategy |
-| `manifest.json` | Commit, package versions and seeds |
+A full run takes about 30–40 minutes on 8 cores. Results are deterministic for a given
+commit and seed list.
 
 Without Docker (Python 3.12):
 
 ```bash
-pip install -r requirements-v2.txt
-PYTHONPATH=src python -m pytest tests_v2
-PYTHONPATH=src python -m fndt.experiments all --out results/v2
-PYTHONPATH=src python -m fndt.report --run results/v2
+pip install -r requirements.txt
+PYTHONPATH=src python -m pytest tests
+PYTHONPATH=src python -m fndt.experiments all --out results
+PYTHONPATH=src python -m fndt.report --run results
 ```
-
-## Scope and limitations
-
-The simulator works at network level. It does not implement a PHY/MAC stack and
-uses synthetic traffic, so its results are controlled simulation evidence, not
-deployment evidence.
-
-See `docs/v2/MODEL.md` §9 for the full list.
-
----
-
-## Legacy prototype (v1)
-
-The original prototype remains in `src/fedndt_rrm`, `configs/*.yaml`, `scripts/`
-and `web/` for reference.
-
-# FedNDT-RRM Simulator
-
-A deterministic, network-level simulator for evaluating a Federated Network Digital Twin (FedNDT) framework for incentive-aware Edge/RAN resource management.
-
-Proposed research framing:
-
-**A Generative AI-Assisted Federated Network Digital Twin Framework for Incentive-Aware Edge and Radio Resource Management in 5G/6G Networks.**
 
 ## Scope
 
-This repository implements a lightweight research simulator for comparing resource-allocation strategies under controlled Edge/RAN stress scenarios.
+This is a network-level abstraction with synthetic traffic. It does not implement a
+PHY/MAC stack and is not validated against operator data. See `docs/MODEL.md` §11.
 
-It is designed for:
+## Repository layout
 
-- research prototyping
-- methodology development
-- deterministic scenario evaluation
-- paper-ready result generation
-- future static web demo deployment
-
-It does **not** claim to be a full physical-layer 5G/6G simulator.
-
-## What the Simulator Does
-
-The simulator includes:
-
-1. synthetic Edge/RAN telemetry generation
-2. local Network Digital Twin state construction
-3. lightweight demand prediction
-4. incentive/reliability scoring
-5. static, greedy, and FedNDT-Incentive resource allocation
-6. latency, SLA, throughput, fairness, prediction-error, overhead, and utility metrics
-7. scenario-suite execution
-8. paper-ready improvement analysis
-
-## Compared Strategies
-
-### Static
-
-Allocates resources equally across Edge/RAN nodes.
-
-This can produce high Jain resource fairness, but it does not adapt to demand imbalance, overloaded nodes, stale reporting, or mobility shifts.
-
-### Greedy
-
-Allocates resources based on observed demand.
-
-In stress scenarios, delayed centralized observation can be used to model stale centralized awareness.
-
-### FedNDT-Incentive
-
-Uses local digital twin state, predicted demand, congestion risk, and incentive/reliability scores to allocate resources adaptively.
-
-This is a proposed framework-level policy, not a proof of globally optimal network control.
-
-## Quick Start
-
-Install dependencies:
-
-```bash
-uv sync
+```
+src/fndt/           simulator, experiments, statistics, report and site generators
+configs/scenarios/  scenario definitions (YAML)
+tests/              verification and integrity tests
+docs/               model specification, plan, amendment, development log, references
+results/            committed outputs of the reported run
+legacy/             archived first prototype and web demo (not used for any reported result)
+```

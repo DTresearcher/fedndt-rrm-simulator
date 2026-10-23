@@ -1,3 +1,0 @@
-name: mobility
-description: Vehicular-like movement (about 9 km/h), causing frequent load shifts between sites.
-traffic: {speed_m_per_slot: 150.0}

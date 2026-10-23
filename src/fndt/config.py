@@ -2,7 +2,7 @@
 
 Every numeric parameter of the model lives here, with its source noted where
 one exists. Scenario YAML files override fields by name; anything not given
-keeps the default below. See docs/v2/MODEL.md for the equations.
+keeps the default below. See docs/MODEL.md for the equations.
 """
 
 from __future__ import annotations
@@ -73,18 +73,34 @@ class NetworkParams:
     buffer_s: float = 2.0  # buffer holds this many seconds of service; excess is dropped
     backhaul_ms: float = 4.0
     sla_ms: float = 100.0
+    # Squared coefficient of variation of true service times. 1 = exponential (M/M/1);
+    # other values give M/G/1 (Pollaczek-Khinchine) while the twin keeps assuming M/M/1.
+    service_scv: float = 1.0
 
 
 @dataclass
 class TelemetryParams:
-    staleness_slots: int = 0  # extra delay on all information sent to the controller
-    report_noise: float = 0.02  # multiplicative noise on all reports (std)
+    """Information model (MODEL.md section 5).
+
+    measurement: each site's own counters = true load x measurement factor.
+    report channel: everything a site sends to the controller (load reports,
+    FL forecasts, twin state) = measured value x channel factor, delayed by
+    staleness_slots, and repeated from the previous message when a stale event
+    occurs. Raw per-user telemetry (Centralized) is aggregated centrally, so it
+    carries no KPI aggregation noise (report_noise) but suffers the same delays,
+    stale events and faulty-pipeline noise (unreliable_noise) as every other message.
+    """
+
+    staleness_slots: int = 0  # delivery delay of every message to the controller
+    report_noise: float = 0.02  # aggregation/reporting noise (lognormal std, mean-corrected)
     unreliable_sites: list[int] = field(default_factory=list)
-    stale_prob: float = 0.0  # unreliable sites repeat their last report
-    unreliable_noise: float = 0.0  # extra multiplicative report noise
-    corrupt_local_data: bool = True  # unreliable sites also train on corrupted data
-    # Twin state estimation: EWMA weight on each new channel report. Fixed on
-    # development seeds 0-4 and applied to every strategy that holds network state.
+    stale_prob: float = 0.0  # unreliable sites: probability a message is a stale repeat
+    unreliable_noise: float = 0.0  # unreliable sites: faulty reporting pipeline, affects all their messages
+    measurement_noise: float = 0.01  # error of every site's own counters
+    corrupted_sites: list[int] = field(default_factory=list)  # faulty counters at the source
+    corrupted_noise: float = 0.0
+    # Twin state estimation: EWMA weight on each new channel/backlog report. Fixed on
+    # development seeds and applied to every strategy that holds network state.
     twin_state_smoothing: float = 0.2
 
 
@@ -100,7 +116,7 @@ class FLParams:
     dropout_sites: list[int] = field(default_factory=list)
     dropout_sites_prob: float = 0.0
     low_quality_sites: list[int] = field(default_factory=list)
-    low_quality_noise: float = 0.0  # label noise std on low-quality sites
+    low_quality_noise: float = 0.0  # noise on the stored training logs only (not on live counters)
     free_rider_sites: list[int] = field(default_factory=list)  # send random updates
     # Device energy model, Yang et al. (2021): kappa C D f^2 + p s / r.
     kappa: float = 1e-28

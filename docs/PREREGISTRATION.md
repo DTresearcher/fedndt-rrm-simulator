@@ -1,5 +1,7 @@
 # Pre-registration of the confirmatory evaluation
 
+> **Status:** the original plan. It is amended by [`PREREGISTRATION_AMENDMENT_1.md`](PREREGISTRATION_AMENDMENT_1.md), which governs the results in `results/`. This file is kept unchanged for the record; file paths refer to the layout at the time.
+
 Written and committed **before** any confirmatory seed (1000 and above) was run.
 The git history shows the commit order. Model development and calibration used
 seeds 0–4 only (see `DEVLOG.md`).

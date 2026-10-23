@@ -46,9 +46,11 @@ class Environment:
     demand: np.ndarray  # (T, U) offered traffic, Mbit/s
     rx_dbm: np.ndarray  # (T, U, S) received PSD from every site, dBm/MHz
     cycles_per_bit: np.ndarray  # (U,)
-    report_noise: np.ndarray  # (T, S) multiplicative report factor
-    report_stale: np.ndarray  # (T, S) bool: unreliable site repeats last report
-    local_label_noise: np.ndarray  # (T, S) multiplicative factor on local training data
+    measurement: np.ndarray  # (T, S) factor of each site's own counters (mean 1)
+    channel_noise: np.ndarray  # (T, S) total factor on KPI messages: aggregation x pipeline (mean 1)
+    pipeline_noise: np.ndarray  # (T, S) faulty-reporting factor of a site, affects every message incl. raw telemetry
+    channel_stale: np.ndarray  # (T, S) bool: the message sent in this slot is a stale repeat
+    training_log_noise: np.ndarray  # (T, S) factor on stored training logs only (mean 1)
     fl_uniforms: np.ndarray  # (n_retrain, rounds, S) participation draws
     fl_seeds: np.ndarray  # (n_retrain,) seeds for local SGD shuffling
     free_rider_noise: np.ndarray  # (n_retrain, rounds, S, D) random updates
@@ -83,6 +85,7 @@ def build_environment(scenario: Scenario, seed: int) -> Environment:
     U = tr.users_per_site * S
     home = rng.choice(S, size=U, p=popularity)
     radius = rp.isd_m / np.sqrt(3.0)
+    area_radius = float(np.linalg.norm(sites, axis=1).max() + radius)
     r0 = radius * np.sqrt(rng.uniform(0.02, 1.0, U))
     a0 = rng.uniform(0, 2 * np.pi, U)
     anchor = sites[home] + np.c_[r0 * np.cos(a0), r0 * np.sin(a0)]
@@ -116,6 +119,13 @@ def build_environment(scenario: Scenario, seed: int) -> Environment:
         heading += rng.normal(0, 0.6, U)
         step = tr.speed_m_per_slot * np.c_[np.cos(heading), np.sin(heading)]
         pos = pos + step + 0.15 * (target - pos)
+        # Users stay inside the simulated area (reflect at its boundary) so that
+        # mobility shifts load between sites instead of pushing users out of coverage.
+        r = np.linalg.norm(pos, axis=1)
+        out = r > area_radius
+        if out.any():
+            pos[out] *= ((2 * area_radius - r[out]) / r[out])[:, None]
+            heading[out] += np.pi
         d2d = np.linalg.norm(pos[:, None, :] - sites[None, :, :], axis=2)
         shadow = rp.shadow_corr * shadow + np.sqrt(1 - rp.shadow_corr**2) * rng.normal(0, rp.shadow_std_db, (U, S))
         rx = rp.tx_dbm_per_mhz - uma_nlos_db(d2d, rp) + shadow
@@ -127,18 +137,25 @@ def build_environment(scenario: Scenario, seed: int) -> Environment:
             level = np.where(np.isin(serving[t], hot), level * tr.hotspot_multiplier, level)
         demand[t] = level
 
-    report_noise = rng.lognormal(0, tm.report_noise, (T, S))
-    report_stale = np.zeros((T, S), dtype=bool)
-    local_label_noise = np.ones((T, S))
+    def factor(sigma, shape):
+        """Mean-one lognormal factor (no upward bias)."""
+        return rng.lognormal(-0.5 * sigma**2, sigma, shape) if sigma > 0 else np.ones(shape)
+
+    measurement = factor(tm.measurement_noise, (T, S))
+    if tm.corrupted_sites:
+        idx = np.array(tm.corrupted_sites)
+        measurement[:, idx] *= factor(tm.corrupted_noise, (T, idx.size))
+    pipeline_noise = np.ones((T, S))
+    channel_stale = np.zeros((T, S), dtype=bool)
     if tm.unreliable_sites:
         idx = np.array(tm.unreliable_sites)
-        report_noise[:, idx] *= rng.lognormal(0, max(tm.unreliable_noise, 1e-9), (T, idx.size))
-        report_stale[:, idx] = rng.random((T, idx.size)) < tm.stale_prob
-        if tm.corrupt_local_data:
-            local_label_noise[:, idx] = rng.lognormal(0, max(tm.unreliable_noise, 1e-9), (T, idx.size))
+        pipeline_noise[:, idx] = factor(tm.unreliable_noise, (T, idx.size))
+        channel_stale[:, idx] = rng.random((T, idx.size)) < tm.stale_prob
+    channel_noise = factor(tm.report_noise, (T, S)) * pipeline_noise
+    training_log_noise = np.ones((T, S))
     if fl.low_quality_sites:
         idx = np.array(fl.low_quality_sites)
-        local_label_noise[:, idx] *= rng.lognormal(0, max(fl.low_quality_noise, 1e-9), (T, idx.size))
+        training_log_noise[:, idx] = factor(fl.low_quality_noise, (T, idx.size))
 
     n_retrain = net.slots // fl.retrain_every_slots + 2
     fl_uniforms = rng.random((n_retrain, fl.rounds, S))
@@ -155,9 +172,11 @@ def build_environment(scenario: Scenario, seed: int) -> Environment:
         demand=demand,
         rx_dbm=rx_dbm,
         cycles_per_bit=cycles_per_bit,
-        report_noise=report_noise,
-        report_stale=report_stale,
-        local_label_noise=local_label_noise,
+        measurement=measurement,
+        channel_noise=channel_noise,
+        pipeline_noise=pipeline_noise,
+        channel_stale=channel_stale,
+        training_log_noise=training_log_noise,
         fl_uniforms=fl_uniforms,
         fl_seeds=fl_seeds,
         free_rider_noise=free_rider_noise,
