@@ -20,3 +20,4 @@ results/*.log
 site/
 legacy/web/node_modules/
 legacy/web/dist/
+!results/tests.log
