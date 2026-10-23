@@ -1,33 +1,29 @@
 [project]
-name = "fedndt-rrm-simulator"
-version = "0.1.0"
-description = "Add your description here"
+name = "fndt-simulator"
+version = "2.0.0"
+description = "Network-level simulator and statistical evaluation for the Federated Network Digital Twin (FNDT) framework"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
-    "matplotlib>=3.10.9",
-    "networkx>=3.6.1",
-    "numpy>=2.4.6",
-    "openai>=2.37.0",
-    "pandas>=3.0.3",
-    "plotly>=6.7.0",
-    "pydantic>=2.13.4",
-    "python-dotenv>=1.2.2",
-    "pyyaml>=6.0.3",
-    "scikit-learn>=1.8.0",
-    "simpy>=4.1.1",
-    "streamlit>=1.57.0",
+    "numpy==2.2.6",
+    "scipy==1.15.3",
+    "pandas==2.2.3",
+    "matplotlib==3.10.3",
+    "pyyaml==6.0.2",
+    "tabulate==0.9.0",
 ]
 
-[project.scripts]
-fedndt-rrm-simulator = "fedndt_rrm_simulator:main"
+[project.optional-dependencies]
+test = ["pytest==8.3.5"]
 
 [build-system]
-requires = ["uv_build>=0.11.15,<0.12.0"]
-build-backend = "uv_build"
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
 
-[dependency-groups]
-dev = [
-    "pytest>=9.0.3",
-    "ruff>=0.15.13",
-]
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["fndt*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

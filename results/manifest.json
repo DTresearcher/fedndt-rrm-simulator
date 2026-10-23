@@ -1,0 +1,36 @@
+{
+  "created_utc": "2026-10-23T14:14:23+00:00",
+  "command": "/app/src/fndt/experiments.py all --seeds 30 --sweep-seeds 20 --workers 8 --out results",
+  "git_commit": "f4228227e87844bedd84288495b7f043cf0eb933",
+  "git_dirty": "unknown",
+  "python": "3.12.13",
+  "platform": "Linux-7.0.12-linuxkit-aarch64-with-glibc2.36",
+  "packages": {
+    "numpy": "2.2.6",
+    "pandas": "2.2.3",
+    "scipy": "1.15.3",
+    "matplotlib": "3.10.3",
+    "pyyaml": "6.0.2"
+  },
+  "confirmatory_seeds": [
+    2000,
+    2029
+  ],
+  "sweep_seeds": [
+    2000,
+    2019
+  ],
+  "scenarios": {
+    "baseline": "c0343a57cca8",
+    "high_load": "5f534dbf923f",
+    "hotspot": "647e2c8b9181",
+    "mobility": "5766cbfd5815",
+    "unreliable_telemetry": "81df1d5c8fe0",
+    "low_quality_contributors": "296e4793f0b5",
+    "corrupted_measurements": "57a4a8fcb720",
+    "high_noniid": "86c39f1aa8ca",
+    "heavy_dropout": "b21ebfb5e625",
+    "radio_degradation": "5e949a497d4f",
+    "model_mismatch": "17c2ec8ce358"
+  }
+}

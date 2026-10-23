@@ -1,0 +1,3 @@
+name: corrupted_measurements
+description: Two sites have faulty counters (60 percent std). The fault is at the source, so it affects everything derived from those sites - local forecasts, training logs, reports and raw telemetry alike.
+telemetry: {corrupted_sites: [1, 4], corrupted_noise: 0.6}

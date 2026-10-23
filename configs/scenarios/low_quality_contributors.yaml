@@ -1,0 +1,3 @@
+name: low_quality_contributors
+description: Two sites store heavily noisy training logs (60 percent std) and one site free-rides with random model updates. Live counters and reports stay accurate, so only federated training is affected.
+fl: {low_quality_sites: [1, 4], low_quality_noise: 0.6, free_rider_sites: [6]}
